@@ -5,10 +5,20 @@
   "main": "client.js",
   "bin": "client.js",
   "pkg": {
+    "assets": [],
+    "scripts": [],
+    "compress": "Brotli",
     "targets": [
       "node18-linux-x64",
       "node18-win-x64"
-    ]
+    ],
+    "patches": {
+      "util/types": "pkg-externals.js",
+      "punycode": "pkg-externals.js",
+      "diagnostics_channel": "pkg-externals.js",
+      "async_hooks": "pkg-externals.js",
+      "trace_events": "pkg-externals.js"
+    }
   },
   "scripts": {
     "start": "node client.js",
