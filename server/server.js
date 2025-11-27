@@ -1,3 +1,4 @@
+require('dotenv').config();
 const net = require("net");
 const crypto = require("crypto");
 const readline = require("readline");
@@ -6,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 // ===================== CONFIGURAÇÕES ======================
-const SECRET = crypto.createHash('sha256').update('minha_senha_segura').digest();
+const SECRET = crypto.createHash('sha256').update(process.env.SECRET).digest();
 const ALGO = "aes-256-gcm";
 const MAX_LOG_LINES = 60;
 const LOG_FILE = path.join(__dirname, "mensagens.log");
@@ -80,7 +81,7 @@ const rl = readline.createInterface({
 // ===================== VARIÁVEIS =====================
 let connected = false;
 let activeSocket = null; // socket do cliente atual
-let serverName = "";
+let serverName = process.env.SERVER_NAME
 
 // Listener de entrada do usuário
 rl.setPrompt("> ");
@@ -98,49 +99,45 @@ rl.on("line", (text) => {
 });
 
 // ===================== SERVIDOR =====================
-rl.question("Nome do servidor: ", (name) => {
-  serverName = name;
+const server = net.createServer((socket) => {
+  if (connected) {
+    socket.write(encrypt(Buffer.from("Servidor ocupado, tente mais tarde.\n")));
+    socket.end();
+    return;
+  }
 
-  const server = net.createServer((socket) => {
-    if (connected) {
-      socket.write(encrypt(Buffer.from("Servidor ocupado, tente mais tarde.\n")));
+  connected = true;
+  activeSocket = socket;
+
+  addLog("Cliente conectado.", COLORS.green);
+  events.emit("notification", "Nova conexão!");
+
+  socket.on("data", (data) => {
+    try {
+      const msg = decrypt(data).toString().trim();
+      addLog(`Cliente: ${msg}`, COLORS.cyan);
+      events.emit("notification", `Nova mensagem: ${msg}`);
+    } catch {
+      addLog("Mensagem inválida ou corrompida", COLORS.red);
       socket.end();
-      return;
     }
-
-    connected = true;
-    activeSocket = socket;
-
-    addLog("Cliente conectado.", COLORS.green);
-    events.emit("notification", "Nova conexão!");
-
-    socket.on("data", (data) => {
-      try {
-        const msg = decrypt(data).toString().trim();
-        addLog(`Cliente: ${msg}`, COLORS.cyan);
-        events.emit("notification", `Nova mensagem: ${msg}`);
-      } catch {
-        addLog("Mensagem inválida ou corrompida", COLORS.red);
-        socket.end();
-      }
-    });
-
-    socket.on("end", () => {
-      addLog("Cliente desconectado.", COLORS.red);
-      connected = false;
-      activeSocket = null;
-    });
-
-    socket.on("error", (err) => {
-      addLog(`Erro na conexão: ${err.message}`, COLORS.red);
-      connected = false;
-      activeSocket = null;
-    });
   });
 
-  server.listen(5888, () => {
-    addLog(`Servidor '${serverName}' aguardando conexão na porta 5888...`, COLORS.green);
+  socket.on("end", () => {
+    addLog("Cliente desconectado.", COLORS.red);
+    connected = false;
+    activeSocket = null;
   });
+
+  socket.on("error", (err) => {
+    addLog(`Erro na conexão: ${err.message}`, COLORS.red);
+    connected = false;
+    activeSocket = null;
+  });
+});
+
+server.listen(5888, () => {
+  addLog(`Servidor '${serverName}' aguardando conexão na porta 5888...`, COLORS.green);
 });
 
 // ===================== NOTIFICAÇÕES =====================

@@ -6,7 +6,6 @@ const path = require("path");
 
 // ===================== CONFIGURAÇÕES ======================
 const CONFIG_FILE = path.join(__dirname, "config.json");
-const SECRET = crypto.createHash('sha256').update('minha_senha_segura').digest();
 const ALGO = "aes-256-gcm";
 const MAX_LOG_LINES = 60;
 const RECONNECT_DELAY = 5000; // 5 segundos
@@ -23,6 +22,7 @@ const COLORS = {
 
 // Buffer de mensagens
 let logBuffer = [];
+let SECRET;
 
 // ===================== ENCRYPT / DECRYPT =====================
 function encrypt(msg) {
@@ -50,7 +50,6 @@ function timestamp() {
 function addLog(msg, color = COLORS.green) {
   const line = `${timestamp()} ${color}${msg}${COLORS.reset}`;
   logBuffer.push(line);
-
   if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
   redraw();
 }
@@ -69,11 +68,48 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
+// ===================== PARSE ARGUMENTOS =====================
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const params = {};
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--host":
+        params.host = args[i + 1];
+        i++;
+        break;
+      case "--port":
+        params.port = Number(args[i + 1]);
+        i++;
+        break;
+      case "--name":
+        params.name = args[i + 1];
+        i++;
+        break;
+      case "--key":
+        params.key = args[i + 1];
+        i++;
+        break;
+    }
+  }
+  return params;
+}
+
+// ===================== CONFIGURAÇÃO INICIAL =====================
 function askConfigAndConnect() {
-  const useLast = fs.existsSync(CONFIG_FILE) ? true : false;
+  const params = parseArgs();
+
+  if (params.host && params.port && params.name && params.key) {
+    SECRET = crypto.createHash('sha256').update(params.key).digest();
+    startConnection(params.name, params.host, params.port);
+    return;
+  }
+
+  const useLast = fs.existsSync(CONFIG_FILE);
 
   const proceedWithLastConfig = () => {
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    SECRET = crypto.createHash('sha256').update(config.password).digest();
     startConnection(config.name, config.host, config.port);
   };
 
@@ -92,14 +128,17 @@ function askConfigAndConnect() {
 
 function askNewConfig() {
   rl.question("Seu nome: ", (name) => {
-    rl.question("Servidor (ex: 192.168.0.50:5888): ", (addr) => {
-      const [host, port] = addr.split(":");
-      if (!host || !port) {
-        console.log("Endereço inválido.");
-        process.exit(1);
-      }
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify({ name, host, port: Number(port) }));
-      startConnection(name, host, Number(port));
+    rl.question("Senha (para criptografia): ", (password) => {
+      rl.question("Servidor (ex: 192.168.0.50:5888): ", (addr) => {
+        const [host, port] = addr.split(":");
+        if (!host || !port) {
+          console.log("Endereço inválido.");
+          process.exit(1);
+        }
+        SECRET = crypto.createHash('sha256').update(password).digest();
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify({ name, password, host, port: Number(port) }));
+        startConnection(name, host, Number(port));
+      });
     });
   });
 }
@@ -131,7 +170,6 @@ function startConnection(name, host, port) {
     attemptReconnect(name, host, port);
   });
 
-  // Entrada contínua
   rl.setPrompt("> ");
   rl.on("line", (text) => {
     if (!text.trim()) return rl.prompt();
