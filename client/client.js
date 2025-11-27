@@ -6,7 +6,7 @@ const { exec } = require("child_process");
 const path = require("path");
 
 // ===================== CONFIGURAÇÕES ======================
-const CONFIG_FILE = path.join(__dirname, "config.json");
+const CONFIG_FILE = path.join(process.cwd(), "config.json");
 const ALGO = "aes-256-gcm";
 const MAX_LOG_LINES = 60;
 const RECONNECT_DELAY = 5000; // 5 segundos
@@ -100,12 +100,29 @@ function parseArgs() {
 function askConfigAndConnect() {
   const params = parseArgs();
 
+  // ------------------ SE VEIO POR ARGUMENTOS ------------------
   if (params.host && params.port && params.name && params.key) {
     SECRET = crypto.createHash('sha256').update(params.key).digest();
+
+    const config = {
+      name: params.name,
+      password: params.key,
+      host: params.host,
+      port: Number(params.port)
+    };
+
+    try {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(config));
+      addLog("Configurações salvas via argumentos.", COLORS.green);
+    } catch (err) {
+      addLog(`Erro ao salvar config.json: ${err.message}`, COLORS.red);
+    }
+
     startConnection(params.name, params.host, params.port);
     return;
   }
 
+  // ------------------ SEM ARGUMENTOS ------------------
   const useLast = fs.existsSync(CONFIG_FILE);
 
   const proceedWithLastConfig = () => {
@@ -126,6 +143,7 @@ function askConfigAndConnect() {
     askNewConfig();
   }
 }
+
 
 function askNewConfig() {
   rl.question("Seu nome: ", (name) => {
