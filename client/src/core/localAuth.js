@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { saveHiddenFile } = require("./hiddenFile");
 
-const AUTH_FILE = path.join(__dirname, "../../auth.json");
+const AUTH_FILE = path.join(process.cwd(), "auth.json");
 
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 50000, 64, "sha512").toString("hex");
