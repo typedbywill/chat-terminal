@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 // ===================== CONFIGURAÇÕES ======================
+const PORT = process.env.PORT || 5888
 const SECRET = crypto.createHash('sha256').update(process.env.SECRET).digest();
 const ALGO = "aes-256-gcm";
 const MAX_LOG_LINES = 60;
@@ -136,8 +137,8 @@ const server = net.createServer((socket) => {
   });
 });
 
-server.listen(5888, () => {
-  addLog(`Servidor '${serverName}' aguardando conexão na porta 5888...`, COLORS.green);
+server.listen(PORT, () => {
+  addLog(`Servidor '${serverName}' aguardando conexão na porta ${PORT}...`, COLORS.green);
 });
 
 // ===================== NOTIFICAÇÕES =====================

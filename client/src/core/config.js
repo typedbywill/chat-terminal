@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { saveHiddenFile } = require("./hiddenFile");
 
 const CONFIG_FILE = path.join(process.cwd(), "config.json");
 
@@ -9,7 +10,7 @@ function loadConfig() {
 }
 
 function saveConfig(data) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(data));
+  saveHiddenFile(CONFIG_FILE, JSON.stringify(data));
 }
 
 module.exports = { loadConfig, saveConfig, CONFIG_FILE };
